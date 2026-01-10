@@ -6,6 +6,7 @@ import { AdminAnalytics } from '@/components/admin-analytics';
 import { UserAnalyticsScreen } from '@/components/user-analytics-screen';
 import { ConversionFunnelScreen } from '@/components/conversion-funnel-screen';
 import { UXInsightsScreen } from '@/components/ux-insights-screen';
+import { ProfileDashboard } from '@/components/profile-dashboard';
 
 export default function Home() {
   const [currentPage, setCurrentPage] = useState('dashboard');
@@ -70,6 +71,16 @@ export default function Home() {
               >
                 UX Insights
               </button>
+              <button
+                onClick={() => setCurrentPage('profile')}
+                className={`px-4 py-2 rounded-t-lg transition-colors font-medium ${
+                  currentPage === 'profile'
+                    ? 'bg-blue-500 text-white'
+                    : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                }`}
+              >
+                Profile
+              </button>
             </nav>
           </div>
         </header>
@@ -81,6 +92,7 @@ export default function Home() {
           {currentPage === 'user-analytics' && <UserAnalyticsScreen />}
           {currentPage === 'conversion' && <ConversionFunnelScreen />}
           {currentPage === 'ux-insights' && <UXInsightsScreen />}
+          {currentPage === 'profile' && <ProfileDashboard />}
         </div>
       </div>
     </div>

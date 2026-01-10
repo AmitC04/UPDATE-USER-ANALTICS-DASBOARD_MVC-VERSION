@@ -2,16 +2,90 @@
 
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
 import { ChevronDown } from 'lucide-react';
+import { useEffect, useState } from 'react';
+import { fetchFunnel } from '@/lib/api';
 
-const funnelSteps = [
-  { step: 'Visitors', count: 50000, dropOff: 0, color: 'bg-blue-500' },
-  { step: 'Registered Users', count: 12500, dropOff: 75, color: 'bg-blue-600' },
-  { step: 'Added to Cart', count: 6250, dropOff: 50, color: 'bg-blue-700' },
-  { step: 'Checkout Started', count: 3750, dropOff: 40, color: 'bg-blue-800' },
-  { step: 'Payment Success', count: 2625, dropOff: 30, color: 'bg-blue-900' },
-];
+interface FunnelStep {
+  step: string;
+  count: number;
+  dropOff: number;
+  color?: string;
+}
+
+interface FunnelData {
+  funnel: FunnelStep[];
+  overall_conversion: number;
+}
 
 export function ConversionFunnelScreen() {
+  const [funnelData, setFunnelData] = useState<FunnelData | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    const loadFunnelData = async () => {
+      try {
+        const response = await fetchFunnel('', '');
+        if (response.success && response.data) {
+          // Add colors to the funnel steps
+          const funnelWithColors = response.data.funnel.map((step: FunnelStep, index: number) => ({
+            ...step,
+            color: getColorForIndex(index, response.data.funnel.length)
+          }));
+          
+          setFunnelData({
+            funnel: funnelWithColors,
+            overall_conversion: response.data.overall_conversion
+          });
+        }
+      } catch (err) {
+        setError(err instanceof Error ? err.message : 'Failed to fetch funnel data');
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    loadFunnelData();
+  }, []);
+
+  const getColorForIndex = (index: number, total: number) => {
+    // Define a color palette for the funnel steps
+    const colors = [
+      'bg-blue-500',    // First step - Visitors
+      'bg-blue-600',    // Second step - Registered Users
+      'bg-indigo-600',  // Third step - Added to Cart
+      'bg-purple-600',  // Fourth step - Checkout Started
+      'bg-violet-600'   // Fifth step - Payment Success
+    ];
+    
+    // Cycle through colors if there are more steps than predefined colors
+    return colors[index % colors.length];
+  };
+
+  if (loading) {
+    return (
+      <div className="flex justify-center items-center h-64">
+        <div className="text-lg text-gray-500">Loading conversion funnel data...</div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="flex justify-center items-center h-64">
+        <div className="text-red-500 text-lg">Error loading funnel data: {error}</div>
+      </div>
+    );
+  }
+
+  if (!funnelData || !funnelData.funnel.length) {
+    return (
+      <div className="flex justify-center items-center h-64">
+        <div className="text-lg text-gray-500">No funnel data available</div>
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-6">
       <Card className="border-gray-200">
@@ -24,28 +98,28 @@ export function ConversionFunnelScreen() {
         <CardContent>
           <div className="max-w-2xl mx-auto">
             <div className="space-y-3">
-              {funnelSteps.map((step, index) => {
+              {funnelData.funnel.map((step, index) => {
                 const widthPercentage = 100 - index * 15;
                 return (
                   <div key={index} className="flex flex-col items-center">
                     <div
-                      className={`${step.color} text-white rounded-lg py-6 px-8 transition-all hover:scale-105 cursor-pointer shadow-md`}
+                      className={`${step.color} text-white rounded-lg py-6 px-8 transition-all hover:scale-105 cursor-pointer shadow-md font-medium`}
                       style={{ width: `${widthPercentage}%` }}
                     >
                       <div className="flex items-center justify-between">
                         <div>
-                          <p className="text-sm opacity-90">{step.step}</p>
-                          <p className="text-2xl font-semibold mt-1">{step.count.toLocaleString()}</p>
+                          <p className="text-sm font-medium opacity-100">{step.step}</p>
+                          <p className="text-2xl font-bold mt-1">{step.count.toLocaleString()}</p>
                         </div>
                         {step.dropOff > 0 && (
                           <div className="text-right">
-                            <p className="text-xs opacity-75">Drop-off</p>
-                            <p className="text-lg font-semibold">-{step.dropOff}%</p>
+                            <p className="text-xs font-medium opacity-90">Drop-off</p>
+                            <p className="text-lg font-bold">-{step.dropOff}%</p>
                           </div>
                         )}
                       </div>
                     </div>
-                    {index < funnelSteps.length - 1 && (
+                    {index < funnelData.funnel.length - 1 && (
                       <ChevronDown className="w-6 h-6 text-gray-400 my-1" />
                     )}
                   </div>
@@ -57,15 +131,19 @@ export function ConversionFunnelScreen() {
               <div className="grid grid-cols-3 gap-4 text-center">
                 <div>
                   <p className="text-sm text-gray-600">Overall Conversion</p>
-                  <p className="text-2xl font-semibold text-blue-600 mt-1">5.25%</p>
+                  <p className="text-2xl font-semibold text-blue-600 mt-1">{funnelData.overall_conversion}%</p>
                 </div>
                 <div>
                   <p className="text-sm text-gray-600">Avg. Drop-off per Step</p>
-                  <p className="text-2xl font-semibold text-blue-600 mt-1">48.75%</p>
+                  <p className="text-2xl font-semibold text-blue-600 mt-1">
+                    {funnelData.funnel.length > 1 
+                      ? (funnelData.funnel.slice(1).reduce((sum, step) => sum + step.dropOff, 0) / (funnelData.funnel.length - 1)).toFixed(2) + '%'
+                      : '0%'}
+                  </p>
                 </div>
                 <div>
                   <p className="text-sm text-gray-600">Total Steps</p>
-                  <p className="text-2xl font-semibold text-blue-600 mt-1">5</p>
+                  <p className="text-2xl font-semibold text-blue-600 mt-1">{funnelData.funnel.length}</p>
                 </div>
               </div>
             </div>

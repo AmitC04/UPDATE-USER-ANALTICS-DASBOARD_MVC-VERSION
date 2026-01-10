@@ -1,14 +1,12 @@
 require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
-const { PrismaClient } = require('@prisma/client');
-
-const prisma = new PrismaClient();
+const prisma = require('./src/prisma');
 const app = express();
 const port = process.env.PORT || 4001;
 
 // Middleware
-app.use(cors({ origin: process.env.CORS_ORIGIN || 'http://localhost:3001' }));
+app.use(cors({ origin: true, credentials: true }));
 app.use(express.json());
 
 // Test database connection
@@ -32,6 +30,9 @@ app.get('/', (req, res) => {
 
 // Analytics routes
 app.use('/api/analytics', require('./src/routes/analytics.routes'));
+
+// User routes
+app.use('/api/user', require('./src/routes/user.routes'));
 
 // Error handling middleware
 app.use((err, req, res, next) => {

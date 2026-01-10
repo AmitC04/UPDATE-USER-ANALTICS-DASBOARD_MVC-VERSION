@@ -1,5 +1,6 @@
 'use client';
 
+import { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
 import { BarChart, Bar, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
@@ -12,51 +13,147 @@ import {
   TableRow,
 } from './ui/table';
 import { Badge } from './ui/badge';
+import { fetchUserAnalytics } from '@/lib/api';
 
-const loginsData = [
-  { date: 'Dec 17', count: 234 },
-  { date: 'Dec 18', count: 289 },
-  { date: 'Dec 19', count: 267 },
-  { date: 'Dec 20', count: 312 },
-  { date: 'Dec 21', count: 298 },
-  { date: 'Dec 22', count: 276 },
-  { date: 'Dec 23', count: 341 },
-];
+interface ChartDataInput {
+  [key: string]: any;
+}
 
-const registrationsData = [
-  { date: 'Dec 17', count: 45 },
-  { date: 'Dec 18', count: 52 },
-  { date: 'Dec 19', count: 48 },
-  { date: 'Dec 20', count: 61 },
-  { date: 'Dec 21', count: 58 },
-  { date: 'Dec 22', count: 54 },
-  { date: 'Dec 23', count: 67 },
-];
+interface LoginsData extends ChartDataInput {
+  date: string;
+  count: number;
+}
 
-const passwordChangesData = [
-  { date: 'Dec 17', count: 12 },
-  { date: 'Dec 18', count: 8 },
-  { date: 'Dec 19', count: 15 },
-  { date: 'Dec 20', count: 10 },
-  { date: 'Dec 21', count: 14 },
-  { date: 'Dec 22', count: 9 },
-  { date: 'Dec 23', count: 11 },
-];
+interface ActivityData extends ChartDataInput {
+  date: string;
+  event: string;
+  count: number;
+  userType: string;
+  authProvider: string;
+  passwordChangedAt: string;
+}
 
-const activityData = [
-  { date: '2024-12-23', event: 'User Login', count: 341, userType: 'Registered', authProvider: 'EMAIL', passwordChangedAt: '2024-11-15' },
-  { date: '2024-12-23', event: 'User Login', count: 189, userType: 'Registered', authProvider: 'GOOGLE', passwordChangedAt: 'N/A' },
-  { date: '2024-12-23', event: 'New Registration', count: 67, userType: 'Guest', authProvider: 'EMAIL', passwordChangedAt: 'Never' },
-  { date: '2024-12-23', event: 'Password Change', count: 11, userType: 'Registered', authProvider: 'EMAIL', passwordChangedAt: '2024-12-23' },
-  { date: '2024-12-22', event: 'User Login', count: 276, userType: 'Registered', authProvider: 'EMAIL', passwordChangedAt: '2024-10-08' },
-  { date: '2024-12-22', event: 'User Login', count: 143, userType: 'Registered', authProvider: 'GOOGLE', passwordChangedAt: 'N/A' },
-  { date: '2024-12-22', event: 'New Registration', count: 54, userType: 'Guest', authProvider: 'EMAIL', passwordChangedAt: 'Never' },
-  { date: '2024-12-22', event: 'Password Change', count: 9, userType: 'Registered', authProvider: 'EMAIL', passwordChangedAt: '2024-12-22' },
-  { date: '2024-12-21', event: 'User Login', count: 298, userType: 'Registered', authProvider: 'EMAIL', passwordChangedAt: '2024-09-20' },
-  { date: '2024-12-21', event: 'New Registration', count: 58, userType: 'Guest', authProvider: 'GOOGLE', passwordChangedAt: 'N/A' },
-];
+interface UserData {
+  daily_stats: LoginsData[];
+  guest_vs_registered: {
+    guest: number;
+    registered: number;
+    total: number;
+  };
+  period: {
+    start: string;
+    end: string;
+  };
+}
 
 export function UserAnalyticsScreen() {
+  const [loginsData, setLoginsData] = useState<LoginsData[]>([]);
+  const [registrationsData, setRegistrationsData] = useState<LoginsData[]>([]);
+  const [passwordChangesData, setPasswordChangesData] = useState<LoginsData[]>([]);
+  const [activityData, setActivityData] = useState<ActivityData[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    const fetchData = async () => {
+      try {
+        const response = await fetchUserAnalytics('', '');
+        if (response.success) {
+          const data: UserData = response.data;
+          
+          // Process daily stats to separate into different categories
+          const logins = data.daily_stats.map(item => ({
+            date: item.date,
+            count: item.logins || 0
+          })).filter(item => item.count > 0);
+          
+          const registrations = data.daily_stats.map(item => ({
+            date: item.date,
+            count: item.registrations || 0
+          })).filter(item => item.count > 0);
+          
+          const passwordChanges = data.daily_stats.map(item => ({
+            date: item.date,
+            count: item.password_changes || 0
+          })).filter(item => item.count > 0);
+          
+          setLoginsData(logins);
+          setRegistrationsData(registrations);
+          setPasswordChangesData(passwordChanges);
+          
+          // Process activity data from backend response
+          // For now, we'll create a simplified version based on daily stats
+          // In a real implementation, the backend would provide detailed activity data
+          const detailedActivity = [];
+          for (const day of data.daily_stats) {
+            if (day.logins > 0) {
+              detailedActivity.push({
+                date: day.date,
+                event: 'User Login',
+                count: day.logins,
+                userType: 'Registered',
+                authProvider: 'EMAIL', // Simplified
+                passwordChangedAt: 'N/A' // Simplified
+              });
+            }
+            if (day.registrations > 0) {
+              detailedActivity.push({
+                date: day.date,
+                event: 'New Registration',
+                count: day.registrations,
+                userType: 'Guest',
+                authProvider: 'EMAIL',
+                passwordChangedAt: 'Never'
+              });
+            }
+            if (day.password_changes > 0) {
+              detailedActivity.push({
+                date: day.date,
+                event: 'Password Change',
+                count: day.password_changes,
+                userType: 'Registered',
+                authProvider: 'EMAIL',
+                passwordChangedAt: day.date
+              });
+            }
+          }
+          setActivityData(detailedActivity);
+        } else {
+          throw new Error(response.error || 'Failed to fetch user analytics');
+        }
+      } catch (err: any) {
+        setError(err.message);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchData();
+  }, []);
+
+  if (error) {
+    return (
+      <div className="p-6 text-center">
+        <h2 className="text-xl font-semibold text-red-600">Error loading data</h2>
+        <p className="text-gray-600">{error}</p>
+        <button 
+          onClick={() => window.location.reload()} 
+          className="mt-4 px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600"
+        >
+          Retry
+        </button>
+      </div>
+    );
+  }
+
+  if (loading) {
+    return (
+      <div className="p-6 text-center">
+        <h2 className="text-xl font-semibold">Loading user analytics...</h2>
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-6">
       <Card className="border-gray-200">

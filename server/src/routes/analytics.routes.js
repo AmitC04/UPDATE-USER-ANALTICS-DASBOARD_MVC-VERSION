@@ -12,5 +12,8 @@ router.get('/funnel', analyticsController.getFunnel);
 // User analytics endpoints
 router.get('/users', analyticsController.getUserAnalytics);
 
+// Detailed analytics endpoints
+router.get('/detailed', analyticsController.getDetailedAnalytics);
+
 module.exports = router;
 

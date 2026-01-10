@@ -14,8 +14,6 @@ services:
       - "3308:3306"  # Using 3308 to avoid conflict with local MySQL
     volumes:
       - mysql_data:/var/lib/mysql
-      - ./emsdb_backup.sql:/docker-entrypoint-initdb.d/01-emsdb_backup.sql:ro
-      - ./analytics_migration.sql:/docker-entrypoint-initdb.d/02-analytics_migration.sql:ro
     command: 
       - --character-set-server=utf8mb4
       - --collation-server=utf8mb4_0900_ai_ci

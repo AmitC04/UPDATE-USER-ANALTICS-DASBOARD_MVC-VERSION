@@ -1,117 +1,235 @@
 'use client';
 
+import { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, BarChart, Bar, PieChart, Pie, Cell } from 'recharts';
 import { Users, UserCheck, Activity, DollarSign, ShoppingCart, UserPlus, Key, RefreshCw, FileCheck, Award } from 'lucide-react';
+import { fetchOverview, fetchRevenueTrend, fetchUserAnalytics, fetchDetailedAnalytics } from '@/lib/api';
 
-const revenueTrendData = [
-  { month: 'Aug', revenue: 42000 },
-  { month: 'Sep', revenue: 48000 },
-  { month: 'Oct', revenue: 53000 },
-  { month: 'Nov', revenue: 61000 },
-  { month: 'Dec', revenue: 72000 },
-];
+interface RevenueTrendData {
+  month: string;
+  revenue: number;
+}
 
-const signupMethodData = [
-  { name: 'Email', value: 156, color: '#3b82f6' },
-  { name: 'Google', value: 98, color: '#10b981' },
-];
+interface ChartDataInput {
+  [key: string]: any;
+}
 
-const topCertificationsData = [
-  { name: 'AWS Solutions Architect', sales: 45 },
-  { name: 'Google Cloud Professional', sales: 38 },
-  { name: 'Azure Developer', sales: 32 },
-  { name: 'CompTIA Security+', sales: 28 },
-  { name: 'CISSP', sales: 24 },
-];
+interface SignupMethodData extends ChartDataInput {
+  name: string;
+  value: number;
+  color: string;
+}
 
-const kpiData = [
-  {
-    title: 'Visitors Today',
-    value: '12,847',
-    subtext: 'Unique page views',
-    icon: Users,
-    color: 'text-blue-600',
-    bgColor: 'bg-blue-50',
-  },
-  {
-    title: 'Logged-in Users Today',
-    value: '3,421',
-    subtext: 'Active sessions',
-    icon: UserCheck,
-    color: 'text-green-600',
-    bgColor: 'bg-green-50',
-  },
-  {
-    title: 'Active Users Now',
-    value: '847',
-    subtext: 'Currently online',
-    icon: Activity,
-    color: 'text-orange-600',
-    bgColor: 'bg-orange-50',
-  },
-  {
-    title: 'Registrations Today',
-    value: '254',
-    subtext: 'New sign-ups',
-    icon: UserPlus,
-    color: 'text-purple-600',
-    bgColor: 'bg-purple-50',
-  },
-  {
-    title: 'Password Changes Today',
-    value: '18',
-    subtext: 'Security updates',
-    icon: Key,
-    color: 'text-indigo-600',
-    bgColor: 'bg-indigo-50',
-  },
-];
+interface TopCertificationsData extends ChartDataInput {
+  name: string;
+  sales: number;
+}
 
-const secondRowKpiData = [
-  {
-    title: 'Orders Today',
-    value: '284',
-    subtext: 'Completed orders',
-    icon: ShoppingCart,
-    color: 'text-pink-600',
-    bgColor: 'bg-pink-50',
-  },
-  {
-    title: 'Revenue Today',
-    value: '$8,432',
-    subtext: 'Total sales',
-    icon: DollarSign,
-    color: 'text-emerald-600',
-    bgColor: 'bg-emerald-50',
-  },
-  {
-    title: 'Refunds Today',
-    value: '12',
-    subtext: '$342 refunded',
-    icon: RefreshCw,
-    color: 'text-red-600',
-    bgColor: 'bg-red-50',
-  },
-  {
-    title: 'Reviews Submitted',
-    value: '34',
-    subtext: 'For certification',
-    icon: FileCheck,
-    color: 'text-cyan-600',
-    bgColor: 'bg-cyan-50',
-  },
-  {
-    title: 'Certifications Sold',
-    value: '167',
-    subtext: 'This month',
-    icon: Award,
-    color: 'text-amber-600',
-    bgColor: 'bg-amber-50',
-  },
-];
+interface KpiData {
+  title: string;
+  value: string;
+  subtext: string;
+  icon: any;
+  color: string;
+  bgColor: string;
+}
+
+// Define chart data interface that works with Recharts
 
 export function AdminAnalytics() {
+  const [revenueTrendData, setRevenueTrendData] = useState<RevenueTrendData[]>([]);
+  const [signupMethodData, setSignupMethodData] = useState<SignupMethodData[]>([]);
+  const [topCertificationsData, setTopCertificationsData] = useState<TopCertificationsData[]>([]);
+  const [kpiData, setKpiData] = useState<KpiData[]>([]);
+  const [secondRowKpiData, setSecondRowKpiData] = useState<KpiData[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    const fetchData = async () => {
+      try {
+        // Fetch revenue trend data
+        const revenueResponse = await fetchRevenueTrend(5);
+        if (revenueResponse.success) {
+          setRevenueTrendData(revenueResponse.data);
+        } else {
+          throw new Error(revenueResponse.error || 'Failed to fetch revenue trend');
+        }
+
+        // Fetch overview data
+        const overviewResponse = await fetchOverview();
+        // Also fetch user analytics to get registration data
+        const userAnalyticsResponse = await fetchUserAnalytics('', '');
+        // Fetch detailed analytics for charts
+        const detailedAnalyticsResponse = await fetchDetailedAnalytics();
+        
+        if (overviewResponse.success) {
+          const data = overviewResponse.data;
+          
+          // Get registration data from user analytics if available
+          let registrationCount = '0';
+          if (userAnalyticsResponse.success && userAnalyticsResponse.data?.daily_stats) {
+            const latestDailyStat = userAnalyticsResponse.data.daily_stats[userAnalyticsResponse.data.daily_stats.length - 1];
+            registrationCount = latestDailyStat?.registrations?.toString() || '0';
+          }
+          
+          // Set KPI data
+          setKpiData([
+            {
+              title: 'Visitors Today',
+              value: data.visitors_today?.toLocaleString() || '0',
+              subtext: 'Unique page views',
+              icon: Users,
+              color: 'text-blue-600',
+              bgColor: 'bg-blue-50',
+            },
+            {
+              title: 'Logged-in Users Today',
+              value: data.logged_in_users_today?.toLocaleString() || '0',
+              subtext: 'Active sessions',
+              icon: UserCheck,
+              color: 'text-green-600',
+              bgColor: 'bg-green-50',
+            },
+            {
+              title: 'Active Users Now',
+              value: data.active_users_now?.toLocaleString() || '0',
+              subtext: 'Currently online',
+              icon: Activity,
+              color: 'text-orange-600',
+              bgColor: 'bg-orange-50',
+            },
+            {
+              title: 'Registrations Today',
+              value: registrationCount, // Get from user analytics daily stats
+              subtext: 'New sign-ups',
+              icon: UserPlus,
+              color: 'text-purple-600',
+              bgColor: 'bg-purple-50',
+            },
+            {
+              title: 'Password Changes Today',
+              value: data.password_changes_today?.toString() || '0', // Get from overview data
+              subtext: 'Security updates',
+              icon: Key,
+              color: 'text-indigo-600',
+              bgColor: 'bg-indigo-50',
+            },
+          ]);
+
+          setSecondRowKpiData([
+            {
+              title: 'Orders Today',
+              value: data.orders_today?.toLocaleString() || '0',
+              subtext: 'Completed orders',
+              icon: ShoppingCart,
+              color: 'text-pink-600',
+              bgColor: 'bg-pink-50',
+            },
+            {
+              title: 'Revenue Today',
+              value: `$${data.revenue_today?.toLocaleString() || '0'}`,
+              subtext: 'Total sales',
+              icon: DollarSign,
+              color: 'text-emerald-600',
+              bgColor: 'bg-emerald-50',
+            },
+            {
+              title: 'Refunds Today',
+              value: data.refunds_today?.toLocaleString() || '0',
+              subtext: 'Refunded orders',
+              icon: RefreshCw,
+              color: 'text-red-600',
+              bgColor: 'bg-red-50',
+            },
+            {
+              title: 'Reviews Submitted',
+              value: detailedAnalyticsResponse.success ? detailedAnalyticsResponse.data.reviews_submitted?.toString() || '0' : '0', // Backend provides this metric
+              subtext: 'For certification',
+              icon: FileCheck,
+              color: 'text-cyan-600',
+              bgColor: 'bg-cyan-50',
+            },
+            {
+              title: 'Certifications Sold',
+              value: data.orders_today?.toString() || '0', // Using orders_today as proxy for certifications sold
+              subtext: 'This month',
+              icon: Award,
+              color: 'text-amber-600',
+              bgColor: 'bg-amber-50',
+            },
+          ]);
+
+          // Set signup methods data based on detailed analytics response
+          if (detailedAnalyticsResponse.success && detailedAnalyticsResponse.data?.signup_methods) {
+            setSignupMethodData(detailedAnalyticsResponse.data.signup_methods);
+          } else {
+            // Fallback to static data if detailed analytics fails
+            setSignupMethodData([
+              { name: 'Email', value: 156, color: '#3b82f6' },
+              { name: 'Google', value: 98, color: '#10b981' },
+            ]);
+          }
+
+          // Set top certifications data based on detailed analytics response
+          if (detailedAnalyticsResponse.success && detailedAnalyticsResponse.data?.top_certifications) {
+            setTopCertificationsData(detailedAnalyticsResponse.data.top_certifications);
+          } else {
+            // Fallback to static data if detailed analytics fails
+            setTopCertificationsData([
+              { name: 'AWS Solutions Architect', sales: 45 },
+              { name: 'Google Cloud Professional', sales: 38 },
+              { name: 'Azure Developer', sales: 32 },
+              { name: 'CompTIA Security+', sales: 28 },
+              { name: 'CISSP', sales: 24 },
+            ]);
+          }
+          // Check if user analytics was successful as well
+          if (!userAnalyticsResponse.success) {
+            console.warn('Failed to fetch user analytics:', userAnalyticsResponse.error);
+          }
+          
+          // Check if detailed analytics was successful as well
+          if (!detailedAnalyticsResponse.success) {
+            console.warn('Failed to fetch detailed analytics:', detailedAnalyticsResponse.error);
+          }
+        } else {
+          throw new Error(overviewResponse.error || 'Failed to fetch overview data');
+        }
+      } catch (err: any) {
+        setError(err.message);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchData();
+  }, []);
+
+  if (error) {
+    return (
+      <div className="p-6 text-center">
+        <h2 className="text-xl font-semibold text-red-600">Error loading data</h2>
+        <p className="text-gray-600">{error}</p>
+        <button 
+          onClick={() => window.location.reload()} 
+          className="mt-4 px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600"
+        >
+          Retry
+        </button>
+      </div>
+    );
+  }
+
+  if (loading) {
+    return (
+      <div className="p-6 text-center">
+        <h2 className="text-xl font-semibold">Loading analytics data...</h2>
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-6">
       {/* First Row KPI Cards */}
