@@ -15,7 +15,10 @@ export function UXInsightsScreen() {
         </CardHeader>
         <CardContent>
           <div className="grid grid-cols-3 gap-6 mb-8">
-            <button className="group relative bg-gradient-to-br from-blue-500 to-blue-600 text-white rounded-xl p-8 hover:from-blue-600 hover:to-blue-700 transition-all hover:shadow-xl">
+            <button 
+              onClick={() => window.open('https://clarity.microsoft.com/projects/view/uzfew3kuik/session-playback', '_blank')}
+              className="group relative bg-gradient-to-br from-blue-500 to-blue-600 text-white rounded-xl p-8 hover:from-blue-600 hover:to-blue-700 transition-all hover:shadow-xl cursor-pointer"
+            >
               <div className="flex flex-col items-center text-center">
                 <div className="bg-white/20 p-4 rounded-full mb-4 group-hover:scale-110 transition-transform">
                   <Play className="w-8 h-8" />
@@ -28,7 +31,10 @@ export function UXInsightsScreen() {
               </div>
             </button>
 
-            <button className="group relative bg-gradient-to-br from-purple-500 to-purple-600 text-white rounded-xl p-8 hover:from-purple-600 hover:to-purple-700 transition-all hover:shadow-xl">
+            <button 
+              onClick={() => window.open('https://clarity.microsoft.com/projects/view/uzfew3kuik/heatmaps', '_blank')}
+              className="group relative bg-gradient-to-br from-purple-500 to-purple-600 text-white rounded-xl p-8 hover:from-purple-600 hover:to-purple-700 transition-all hover:shadow-xl cursor-pointer"
+            >
               <div className="flex flex-col items-center text-center">
                 <div className="bg-white/20 p-4 rounded-full mb-4 group-hover:scale-110 transition-transform">
                   <Map className="w-8 h-8" />
@@ -41,12 +47,15 @@ export function UXInsightsScreen() {
               </div>
             </button>
 
-            <button className="group relative bg-gradient-to-br from-orange-500 to-orange-600 text-white rounded-xl p-8 hover:from-orange-600 hover:to-orange-700 transition-all hover:shadow-xl">
+            <button 
+              onClick={() => window.open('https://clarity.microsoft.com/projects/view/uzfew3kuik/frustration', '_blank')}
+              className="group relative bg-gradient-to-br from-orange-500 to-orange-600 text-white rounded-xl p-8 hover:from-orange-600 hover:to-orange-700 transition-all hover:shadow-xl cursor-pointer"
+            >
               <div className="flex flex-col items-center text-center">
                 <div className="bg-white/20 p-4 rounded-full mb-4 group-hover:scale-110 transition-transform">
                   <MousePointerClick className="w-8 h-8" />
                 </div>
-                <h3 className="text-xl font-semibold mb-2">View Click Rage Reports</h3>
+                <h3 className="text-xl font-semibold mb-2">View Frustration Reports</h3>
                 <p className="text-sm opacity-90">
                   Identify frustration points and UI issues
                 </p>
