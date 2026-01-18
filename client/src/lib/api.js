@@ -102,7 +102,18 @@ export const fetchUser = async () => {
     return response.data;
   } catch (error) {
     console.error('Error fetching user:', error);
-    throw error;
+    // If authentication fails, try the demo endpoint
+    if (error.response?.status === 401 || error.response?.status === 400) {
+      try {
+        const demoResponse = await api.get('/api/user/getDemoUser');
+        return demoResponse.data;
+      } catch (demoError) {
+        console.error('Error fetching demo user:', demoError);
+        throw error; // Throw original error if demo also fails
+      }
+    } else {
+      throw error;
+    }
   }
 };
 

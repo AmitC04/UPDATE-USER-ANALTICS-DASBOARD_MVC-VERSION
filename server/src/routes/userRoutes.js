@@ -1,6 +1,6 @@
 const express = require('express');
 const router = express.Router();
-const userController = require('../controllers/user.controller');
+const userController = require('../controllers/userController');
 const { requireAuth } = require('../middleware/auth');
 
 // User profile endpoints

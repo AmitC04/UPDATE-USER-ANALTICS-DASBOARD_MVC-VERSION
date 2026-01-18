@@ -1,6 +1,9 @@
-const { PrismaClient } = require('@prisma/client');
+const { getUserById, getDemoUser: getDemoUserFromModel } = require('../models/userModel');
 
-const prisma = new PrismaClient();
+/**
+ * User Controller
+ * Handles HTTP requests and responses for user endpoints
+ */
 
 /**
  * Get user profile
@@ -19,19 +22,7 @@ async function getUser(req, res) {
     }
 
     // Fetch user data from the users table
-    const user = await prisma.users.findUnique({
-      where: {
-        user_id: Number(userId) // Ensure it's a number for Prisma
-      },
-      select: {
-        user_id: true,
-        first_name: true,
-        last_name: true,
-        email: true,
-        auth_provider: true,
-        password_changed_at: true,
-      }
-    });
+    const user = await getUserById(Number(userId));
 
     if (!user) {
       return res.status(404).json({
@@ -54,22 +45,16 @@ async function getUser(req, res) {
   }
 }
 
-// Mock endpoint for demo purposes - bypasses authentication
+/**
+ * Get demo user for unauthenticated access
+ */
 async function getDemoUser(req, res) {
   try {
-    // Return a sample user for demo purposes
-    const demoUser = {
-      user_id: 1,
-      first_name: 'Demo',
-      last_name: 'User',
-      email: 'demo@example.com',
-      auth_provider: 'email',
-      password_changed_at: new Date().toISOString()
-    };
+    const user = await getDemoUserFromModel();
 
     res.json({
       success: true,
-      data: demoUser
+      data: user
     });
   } catch (error) {
     console.error('Error fetching demo user:', error);
@@ -83,5 +68,5 @@ async function getDemoUser(req, res) {
 
 module.exports = {
   getUser,
-  getDemoUser
+  getDemoUser,
 };

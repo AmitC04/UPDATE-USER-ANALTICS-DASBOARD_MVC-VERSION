@@ -1,31 +1,17 @@
 const prisma = require('../prisma');
 
 /**
- * Get overview analytics (today's metrics)
- * Updated to match Word document schema (v1.1)
+ * Analytics Model
+ * Contains all database logic for analytics operations
  */
-async function getOverview(req, res) {
+
+// Get overview analytics (today's metrics)
+async function getOverviewData() {
   try {
     const today = new Date();
     today.setHours(0, 0, 0, 0);
     const tomorrow = new Date(today);
     tomorrow.setDate(tomorrow.getDate() + 1);
-
-    // #region agent log
-    fetch('http://127.0.0.1:7242/ingest/d720bab6-b9af-4950-b242-c38c1de81b10', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        sessionId: 'debug-session',
-        runId: 'pre-fix',
-        hypothesisId: 'H1',
-        location: 'analytics.controller.js:getOverview',
-        message: 'entry getOverview',
-        data: { start: today.toISOString(), end: tomorrow.toISOString() },
-        timestamp: Date.now(),
-      }),
-    }).catch(() => {});
-    // #endregion
 
     // Visitors today (unique sessions)
     const visitorsToday = await prisma.user_sessions.count({
@@ -174,97 +160,29 @@ async function getOverview(req, res) {
       }
     });
 
-    // #region agent log
-    fetch('http://127.0.0.1:7242/ingest/d720bab6-b9af-4950-b242-c38c1de81b10', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        sessionId: 'debug-session',
-        runId: 'pre-fix',
-        hypothesisId: 'H1',
-        location: 'analytics.controller.js:getOverview',
-        message: 'result getOverview',
-        data: {
-          visitorsToday,
-          loggedInUsersToday,
-          activeUsersNow,
-          revenueToday,
-          ordersToday,
-          refundsToday,
-        },
-        timestamp: Date.now(),
-      }),
-    }).catch(() => {});
-    // #endregion
-
-    res.json({
-      success: true,
-      data: {
-        visitors_today: visitorsToday,
-        logged_in_users_today: loggedInUsersToday,
-        active_users_now: activeUsersNow,
-        revenue_today: revenueToday,
-        orders_today: ordersToday,
-        refunds_today: refundsToday,
-        recent_activity: recentActivity,
-        recent_profile_updates: recentProfileUpdates,
-        password_changes_today: passwordChangesToday,
-        profile_updates_today: profileUpdatesToday,
-        last_sensitive_change: recentActivity[0]?.time || null
-      },
-    });
+    return {
+      visitors_today: visitorsToday,
+      logged_in_users_today: loggedInUsersToday,
+      active_users_now: activeUsersNow,
+      revenue_today: revenueToday,
+      orders_today: ordersToday,
+      refunds_today: refundsToday,
+      recent_activity: recentActivity,
+      recent_profile_updates: recentProfileUpdates,
+      password_changes_today: passwordChangesToday,
+      profile_updates_today: profileUpdatesToday,
+      last_sensitive_change: recentActivity[0]?.time || null
+    };
   } catch (error) {
-    console.error('Error fetching overview analytics:', error);
-
-    // #region agent log
-    fetch('http://127.0.0.1:7242/ingest/d720bab6-b9af-4950-b242-c38c1de81b10', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        sessionId: 'debug-session',
-        runId: 'pre-fix',
-        hypothesisId: 'H2',
-        location: 'analytics.controller.js:getOverview',
-        message: 'error getOverview',
-        data: { error: error?.message || String(error) },
-        timestamp: Date.now(),
-      }),
-    }).catch(() => {});
-    // #endregion
-
-    res.status(500).json({
-      success: false,
-      error: 'Failed to fetch overview analytics',
-      message: error.message,
-    });
+    throw error;
   }
 }
 
-/**
- * Get conversion funnel data
- * Updated to match Word document schema (v1.1)
- */
-async function getFunnel(req, res) {
+// Get conversion funnel data
+async function getFunnelData(startDate, endDate) {
   try {
-    const { startDate, endDate } = req.query;
     const start = startDate ? new Date(startDate) : new Date(Date.now() - 30 * 24 * 60 * 60 * 1000); // Default: last 30 days
     const end = endDate ? new Date(endDate) : new Date();
-
-    // #region agent log
-    fetch('http://127.0.0.1:7242/ingest/d720bab6-b9af-4950-b242-c38c1de81b10', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        sessionId: 'debug-session',
-        runId: 'pre-fix',
-        hypothesisId: 'H3',
-        location: 'analytics.controller.js:getFunnel',
-        message: 'entry getFunnel',
-        data: { start: start.toISOString(), end: end.toISOString() },
-        timestamp: Date.now(),
-      }),
-    }).catch(() => {});
-    // #endregion
 
     // Visitors (all sessions)
     const visitors = await prisma.user_sessions.count({
@@ -357,75 +275,24 @@ async function getFunnel(req, res) {
     // Overall conversion rate
     const overallConversion = visitors > 0 ? ((paymentSuccess / visitors) * 100).toFixed(2) : 0;
 
-    // #region agent log
-    fetch('http://127.0.0.1:7242/ingest/d720bab6-b9af-4950-b242-c38c1de81b10', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        sessionId: 'debug-session',
-        runId: 'pre-fix',
-        hypothesisId: 'H3',
-        location: 'analytics.controller.js:getFunnel',
-        message: 'result getFunnel',
-        data: {
-          visitors,
-          registered,
-          addedToCart,
-          checkoutStarted,
-          paymentSuccess,
-          overallConversion,
-        },
-        timestamp: Date.now(),
-      }),
-    }).catch(() => {});
-    // #endregion
-
-    res.json({
-      success: true,
-      data: {
-        funnel,
-        overall_conversion: parseFloat(overallConversion),
-        period: {
-          start: start.toISOString(),
-          end: end.toISOString(),
-        },
+    return {
+      funnel,
+      overall_conversion: parseFloat(overallConversion),
+      period: {
+        start: start.toISOString(),
+        end: end.toISOString(),
       },
-    });
+    };
   } catch (error) {
-    console.error('Error fetching funnel data:', error);
-    res.status(500).json({
-      success: false,
-      error: 'Failed to fetch funnel data',
-      message: error.message,
-    });
+    throw error;
   }
 }
 
-/**
- * Get user analytics
- * Updated to match Word document schema (v1.1)
- */
-async function getUserAnalytics(req, res) {
+// Get user analytics
+async function getUserAnalyticsData(startDate, endDate) {
   try {
-    const { startDate, endDate } = req.query;
     const start = startDate ? new Date(startDate) : new Date(Date.now() - 7 * 24 * 60 * 60 * 1000); // Default: last 7 days
     const end = endDate ? new Date(endDate) : new Date();
-
-    // #region agent log
-    fetch('http://127.0.0.1:7242/ingest/d720bab6-b9af-4950-b242-c38c1de81b10', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        sessionId: 'debug-session',
-        runId: 'pre-fix',
-        hypothesisId: 'H4',
-        location: 'analytics.controller.js:getUserAnalytics',
-        message: 'entry getUserAnalytics',
-        data: { start: start.toISOString(), end: end.toISOString() },
-        timestamp: Date.now(),
-      }),
-    }).catch(() => {});
-    // #endregion
 
     // Group by date
     const dateMap = new Map();
@@ -523,76 +390,28 @@ async function getUserAnalytics(req, res) {
       },
     });
 
-    // #region agent log
-    fetch('http://127.0.0.1:7242/ingest/d720bab6-b9af-4950-b242-c38c1de81b10', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        sessionId: 'debug-session',
-        runId: 'pre-fix',
-        hypothesisId: 'H4',
-        location: 'analytics.controller.js:getUserAnalytics',
-        message: 'result getUserAnalytics',
-        data: {
-          dailyStatsLength: dailyStats.length,
-          guestCount,
-          registeredCount,
-        },
-        timestamp: Date.now(),
-      }),
-    }).catch(() => {});
-    // #endregion
-
-    res.json({
-      success: true,
-      data: {
-        daily_stats: dailyStats,
-        guest_vs_registered: {
-          guest: guestCount,
-          registered: registeredCount,
-          total: guestCount + registeredCount,
-        },
-        period: {
-          start: start.toISOString(),
-          end: end.toISOString(),
-        },
+    return {
+      daily_stats: dailyStats,
+      guest_vs_registered: {
+        guest: guestCount,
+        registered: registeredCount,
+        total: guestCount + registeredCount,
       },
-    });
+      period: {
+        start: start.toISOString(),
+        end: end.toISOString(),
+      },
+    };
   } catch (error) {
-    console.error('Error fetching user analytics:', error);
-    res.status(500).json({
-      success: false,
-      error: 'Failed to fetch user analytics',
-      message: error.message,
-    });
+    throw error;
   }
 }
 
-/**
- * Get revenue trend (last N months)
- * Updated to match Word document schema (v1.1)
- */
-async function getRevenueTrend(req, res) {
+// Get revenue trend (last N months)
+async function getRevenueTrendData(months = 5) {
   try {
-    const { months = 5 } = req.query;
     const monthsArray = [];
     const now = new Date();
-
-    // #region agent log
-    fetch('http://127.0.0.1:7242/ingest/d720bab6-b9af-4950-b242-c38c1de81b10', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        sessionId: 'debug-session',
-        runId: 'pre-fix',
-        hypothesisId: 'H5',
-        location: 'analytics.controller.js:getRevenueTrend',
-        message: 'entry getRevenueTrend',
-        data: { months: parseInt(months) },
-        timestamp: Date.now(),
-      }),
-    }).catch(() => {});
-    // #endregion
 
     for (let i = parseInt(months) - 1; i >= 0; i--) {
       const date = new Date(now.getFullYear(), now.getMonth() - i, 1);
@@ -633,66 +452,14 @@ async function getRevenueTrend(req, res) {
       })
     );
 
-    // #region agent log
-    fetch('http://127.0.0.1:7242/ingest/d720bab6-b9af-4950-b242-c38c1de81b10', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        sessionId: 'debug-session',
-        runId: 'pre-fix',
-        hypothesisId: 'H5',
-        location: 'analytics.controller.js:getRevenueTrend',
-        message: 'result getRevenueTrend',
-        data: { monthsRequested: monthsArray.length, revenueDataLength: revenueData.length },
-        timestamp: Date.now(),
-      }),
-    }).catch(() => {});
-    // #endregion
-
-    res.json({
-      success: true,
-      data: revenueData,
-    });
+    return revenueData;
   } catch (error) {
-    console.error('Error fetching revenue trend:', error);
-
-    // #region agent log
-    fetch('http://127.0.0.1:7242/ingest/d720bab6-b9af-4950-b242-c38c1de81b10', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        sessionId: 'debug-session',
-        runId: 'pre-fix',
-        hypothesisId: 'H5',
-        location: 'analytics.controller.js:getRevenueTrend',
-        message: 'error getRevenueTrend',
-        data: { error: error?.message || String(error) },
-        timestamp: Date.now(),
-      }),
-    }).catch(() => {});
-    // #endregion
-
-    res.status(500).json({
-      success: false,
-      error: 'Failed to fetch revenue trend',
-      message: error.message,
-    });
+    throw error;
   }
 }
 
-module.exports = {
-  getOverview,
-  getFunnel,
-  getUserAnalytics,
-  getRevenueTrend,
-  getDetailedAnalytics,
-};
-
-/**
- * Get detailed analytics for charts and advanced metrics
- * Updated to match Word document schema (v1.1)
- */
-async function getDetailedAnalytics(req, res) {
+// Get detailed analytics for charts and advanced metrics
+async function getDetailedAnalyticsData() {
   try {
     const today = new Date();
     today.setHours(0, 0, 0, 0);
@@ -753,24 +520,20 @@ async function getDetailedAnalytics(req, res) {
       { name: 'CISSP', sales: 24 },
     ];
 
-    // Additional detailed metrics that might be useful
-    const detailedMetrics = {
+    return {
       signup_methods: signupMethods,
       top_certifications: topCertifications,
       reviews_submitted: reviewCount,
-      // You could add more detailed metrics here as needed
     };
-
-    res.json({
-      success: true,
-      data: detailedMetrics,
-    });
   } catch (error) {
-    console.error('Error fetching detailed analytics:', error);
-    res.status(500).json({
-      success: false,
-      error: 'Failed to fetch detailed analytics',
-      message: error.message,
-    });
+    throw error;
   }
 }
+
+module.exports = {
+  getOverviewData,
+  getFunnelData,
+  getUserAnalyticsData,
+  getRevenueTrendData,
+  getDetailedAnalyticsData,
+};

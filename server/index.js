@@ -29,10 +29,10 @@ app.get('/', (req, res) => {
 });
 
 // Analytics routes
-app.use('/api/analytics', require('./src/routes/analytics.routes'));
+app.use('/api/analytics', require('./src/routes/analyticsRoutes'));
 
 // User routes
-app.use('/api/user', require('./src/routes/user.routes'));
+app.use('/api/user', require('./src/routes/userRoutes'));
 
 // Error handling middleware
 app.use((err, req, res, next) => {
