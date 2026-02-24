@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
 import { fetchUser } from '@/lib/api';
+import { LoadingSpinner } from './ui/loading-spinner'; // Issue #16
 
 interface UserData {
   user_id: number;
@@ -11,6 +12,7 @@ interface UserData {
   email: string;
   auth_provider: string;
   password_changed_at: string;
+  isDemo?: boolean;
 }
 
 export function ProfileDashboard() {
@@ -22,8 +24,10 @@ export function ProfileDashboard() {
     const fetchProfile = async () => {
       try {
         const res = await fetchUser();
-        if (res.success) {
-          setUserData(res.data);
+        // fetchUser may return { success, data, isDemo } or { success, data }
+        const payload = res.data ?? res;
+        if (res.success !== false) {
+          setUserData({ ...payload, isDemo: res.isDemo ?? false });
         } else {
           setError(res.error || 'Failed to fetch user data');
         }
@@ -53,15 +57,16 @@ export function ProfileDashboard() {
   }
 
   if (loading) {
-    return (
-      <div className="p-6 text-center">
-        <h2 className="text-xl font-semibold">Loading profile...</h2>
-      </div>
-    );
+    return <LoadingSpinner message="Loading profile..." />;
   }
 
   return (
     <div className="space-y-6">
+      {userData?.isDemo && (
+        <div className="rounded-md bg-amber-50 border border-amber-200 px-4 py-2 text-sm text-amber-700">
+          Demo data — no authenticated user. Provide a Bearer token to view a real profile.
+        </div>
+      )}
       <Card className="border-gray-200">
         <CardHeader>
           <CardTitle>User Profile</CardTitle>

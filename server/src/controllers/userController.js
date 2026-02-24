@@ -1,72 +1,48 @@
-const { getUserById, getDemoUser: getDemoUserFromModel } = require('../models/userModel');
+const { getUserProfile, getDemoUserProfile } = require('../services/userService');
+const logger = require('../utils/logger');
+const AppError = require('../utils/AppError');
 
 /**
  * User Controller
- * Handles HTTP requests and responses for user endpoints
+ * Issue #8 - HTTP handling ONLY; business logic lives in userService.js
  */
 
 /**
- * Get user profile
+ * GET /api/v1/user/getUser
+ * Issue #1 - IDOR fixed: users can only access their own data;
+ *            admins can request any user via ?id=
  */
-async function getUser(req, res) {
+async function getUser(req, res, next) {
   try {
-    // In a real implementation, you would get the user ID from req.user after authentication
-    // For now, we'll return a sample user profile
-    const userId = req.query.id || req.user?.id;
-    
-    if (!userId) {
-      return res.status(400).json({
-        success: false,
-        error: 'User ID is required'
-      });
+    // req.user is guaranteed to exist (requireAuth middleware runs first)
+    const requestedId = req.query.id ? Number(req.query.id) : null;
+
+    // Validate that ?id= is a positive integer when provided
+    if (req.query.id && (!Number.isInteger(requestedId) || requestedId <= 0)) {
+      return res.status(400).json({ success: false, error: 'Invalid user ID' });
     }
 
-    // Fetch user data from the users table
-    const user = await getUserById(Number(userId));
+    const user = await getUserProfile(req.user, requestedId);
 
-    if (!user) {
-      return res.status(404).json({
-        success: false,
-        error: 'User not found'
-      });
-    }
-
-    res.json({
-      success: true,
-      data: user
-    });
+    res.json({ success: true, data: user });
   } catch (error) {
-    console.error('Error fetching user:', error);
-    res.status(500).json({
-      success: false,
-      error: 'Failed to fetch user',
-      message: error.message,
-    });
+    next(error); // Issue #9 - delegate to centralized error handler
   }
 }
 
 /**
- * Get demo user for unauthenticated access
+ * GET /api/v1/user/getDemoUser  (development only – see userRoutes.js)
+ * Issue #2 - route guarded by NODE_ENV check in routes file
  */
-async function getDemoUser(req, res) {
+async function getDemoUser(req, res, next) {
   try {
-    const user = await getDemoUserFromModel();
-
-    res.json({
-      success: true,
-      data: user
-    });
+    const user = await getDemoUserProfile();
+    res.json({ success: true, data: user });
   } catch (error) {
-    console.error('Error fetching demo user:', error);
-    res.status(500).json({
-      success: false,
-      error: 'Failed to fetch demo user',
-      message: error.message,
-    });
+    // Issue #3 - log internally, surface only safe message
+    logger.error('Error fetching demo user:', { error: error.message });
+    next(error);
   }
 }
 
-module.exports = {
-  getUser,
-  getDemoUser,
-};
+module.exports = { getUser, getDemoUser };

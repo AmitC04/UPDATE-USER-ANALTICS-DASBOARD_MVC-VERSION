@@ -14,6 +14,7 @@ import {
   Clock
 } from 'lucide-react';
 import { fetchOverview } from '@/lib/api';
+import { LoadingSpinner } from './ui/loading-spinner'; // Issue #16
 
 interface AnalyticsData {
   visitors_today: number;

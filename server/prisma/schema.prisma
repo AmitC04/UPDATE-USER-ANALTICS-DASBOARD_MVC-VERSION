@@ -38,6 +38,8 @@ model user_activity {
   @@index([session_id], map: "idx_user_activity_session")
   @@index([event_time], map: "idx_user_activity_time")
   @@index([order_id], map: "idx_user_activity_order")
+  // Issue #17 - Composite index for time + type queries (most common analytics pattern)
+  @@index([event_time, event_type], map: "idx_activity_time_type")
   @@map("user_activity")
 }
 

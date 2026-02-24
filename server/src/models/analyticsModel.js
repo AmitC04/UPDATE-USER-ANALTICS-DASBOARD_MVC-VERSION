@@ -6,159 +6,92 @@ const prisma = require('../prisma');
  */
 
 // Get overview analytics (today's metrics)
+// Issue #22 - Parallelized independent queries with Promise.all
 async function getOverviewData() {
   try {
     const today = new Date();
     today.setHours(0, 0, 0, 0);
     const tomorrow = new Date(today);
     tomorrow.setDate(tomorrow.getDate() + 1);
-
-    // Visitors today (unique sessions)
-    const visitorsToday = await prisma.user_sessions.count({
-      where: {
-        login_time: {
-          gte: today,
-          lt: tomorrow,
-        },
-      },
-    });
-
-    // Logged-in users today
-    const loggedInUsersToday = await prisma.user_sessions.count({
-      where: {
-        login_time: {
-          gte: today,
-          lt: tomorrow,
-        },
-        is_guest: false,
-      },
-    });
-
-    // Active users now (sessions active in last 5 minutes, not logged out)
     const fiveMinutesAgo = new Date(Date.now() - 5 * 60 * 1000);
-    const activeUsersNow = await prisma.user_sessions.count({
-      where: {
-        logout_time: null, // Not logged out
-        last_seen_at: {
-          gte: fiveMinutesAgo,
-        },
-      },
-    });
 
-    // Revenue today (from payment_success events - use amount column)
-    const revenueEvents = await prisma.user_activity.findMany({
-      where: {
-        event_type: 'payment_success',
-        event_time: {
-          gte: today,
-          lt: tomorrow,
+    // Issue #22 - Run all independent queries in parallel
+    const [
+      visitorsToday,
+      loggedInUsersToday,
+      activeUsersNow,
+      revenueEvents,
+      ordersToday,
+      refundsToday,
+      recentActivityRaw,
+      recentProfileUpdatesRaw,
+      passwordChangesToday,
+      profileUpdatesToday,
+    ] = await Promise.all([
+      prisma.user_sessions.count({
+        where: { login_time: { gte: today, lt: tomorrow } },
+      }),
+      prisma.user_sessions.count({
+        where: { login_time: { gte: today, lt: tomorrow }, is_guest: false },
+      }),
+      prisma.user_sessions.count({
+        where: { logout_time: null, last_seen_at: { gte: fiveMinutesAgo } },
+      }),
+      prisma.user_activity.findMany({
+        where: {
+          event_type: 'payment_success',
+          event_time: { gte: today, lt: tomorrow },
+          amount: { not: null },
         },
-        amount: {
-          not: null,
-        },
-      },
-      select: {
-        amount: true,
-        currency: true,
-      },
-    });
+        select: { amount: true, currency: true },
+      }),
+      prisma.user_activity.count({
+        where: { event_type: 'payment_success', event_time: { gte: today, lt: tomorrow } },
+      }),
+      prisma.user_activity.count({
+        where: { event_type: 'payment_failed', event_time: { gte: today, lt: tomorrow } },
+      }),
+      prisma.user_activity.findMany({
+        take: 5,
+        orderBy: { event_time: 'desc' },
+        include: { users: { select: { email: true } } },
+      }),
+      prisma.user_audit_log.findMany({
+        take: 5,
+        where: { action_type: 'profile_updated' },
+        orderBy: { created_at: 'desc' },
+        include: { users: { select: { email: true } } },
+      }),
+      prisma.user_audit_log.count({
+        where: { action_type: 'password_changed', created_at: { gte: today, lt: tomorrow } },
+      }),
+      prisma.user_audit_log.count({
+        where: { action_type: 'profile_updated', created_at: { gte: today, lt: tomorrow } },
+      }),
+    ]);
 
+    // Compute revenue from parallelised result
     let revenueToday = 0;
     revenueEvents.forEach((event) => {
       if (event.amount) {
-        // Convert to number (Prisma Decimal type)
-        const amount = typeof event.amount === 'object' ? parseFloat(event.amount.toString()) : parseFloat(event.amount);
+        const amount = typeof event.amount === 'object'
+          ? parseFloat(event.amount.toString())
+          : parseFloat(event.amount);
         revenueToday += amount || 0;
       }
     });
 
-    // Orders today (payment_success events)
-    const ordersToday = await prisma.user_activity.count({
-      where: {
-        event_type: 'payment_success',
-        event_time: {
-          gte: today,
-          lt: tomorrow,
-        },
-      },
-    });
-
-    // Refunds today (payment_failed events - adjust if you have a refund event type)
-    const refundsToday = await prisma.user_activity.count({
-      where: {
-        event_type: 'payment_failed',
-        event_time: {
-          gte: today,
-          lt: tomorrow,
-        },
-      },
-    });
-
-    // Recent activity (last 5 activities)
-    const recentActivityRaw = await prisma.user_activity.findMany({
-      take: 5,
-      orderBy: {
-        event_time: 'desc'
-      },
-      include: {
-        users: {
-          select: {
-            email: true
-          }
-        }
-      }
-    });
-
-    const recentActivity = recentActivityRaw.map(activity => ({
-      action: activity.event_type.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase()),
+    const recentActivity = recentActivityRaw.map((activity) => ({
+      action: activity.event_type.replace(/_/g, ' ').replace(/\b\w/g, (l) => l.toUpperCase()),
       user: activity.users?.email || (activity.is_guest ? 'Guest User' : 'Unknown User'),
-      time: activity.event_time
+      time: activity.event_time,
     }));
 
-    // Recent profile updates (last 5 audit logs)
-    const recentProfileUpdatesRaw = await prisma.user_audit_log.findMany({
-      take: 5,
-      where: {
-        action_type: 'profile_updated'
-      },
-      orderBy: {
-        created_at: 'desc'
-      },
-      include: {
-        users: {
-          select: {
-            email: true
-          }
-        }
-      }
-    });
-
-    const recentProfileUpdates = recentProfileUpdatesRaw.map(update => ({
+    const recentProfileUpdates = recentProfileUpdatesRaw.map((update) => ({
       user: update.users?.email || 'Unknown User',
       field: 'Profile Information',
-      time: update.created_at
+      time: update.created_at,
     }));
-
-    // Security metrics
-    const passwordChangesToday = await prisma.user_audit_log.count({
-      where: {
-        action_type: 'password_changed',
-        created_at: {
-          gte: today,
-          lt: tomorrow,
-        },
-      }
-    });
-
-    const profileUpdatesToday = await prisma.user_audit_log.count({
-      where: {
-        action_type: 'profile_updated',
-        created_at: {
-          gte: today,
-          lt: tomorrow,
-        }
-      }
-    });
 
     return {
       visitors_today: visitorsToday,
@@ -171,7 +104,7 @@ async function getOverviewData() {
       recent_profile_updates: recentProfileUpdates,
       password_changes_today: passwordChangesToday,
       profile_updates_today: profileUpdatesToday,
-      last_sensitive_change: recentActivity[0]?.time || null
+      last_sensitive_change: recentActivity[0]?.time || null,
     };
   } catch (error) {
     throw error;
@@ -490,13 +423,8 @@ async function getDetailedAnalyticsData() {
       color: item.event_type === 'register_email' ? '#3b82f6' : '#10b981' // blue for email, green for google
     }));
 
-    // If no registrations today, default to some values
-    if (signupMethods.length === 0) {
-      signupMethods.push(
-        { name: 'Email', value: 156, color: '#3b82f6' },
-        { name: 'Google', value: 98, color: '#10b981' }
-      );
-    }
+    // If no registrations today, return empty array (no mock data in production)
+    // Issue #12 - hardcoded fallback data removed
 
     // Get review submissions
     const reviewCount = await prisma.user_activity.count({
@@ -509,16 +437,9 @@ async function getDetailedAnalyticsData() {
       },
     });
 
-    // Get top certifications (based on payment_success events for specific products/certifications)
-    // For this example, we'll use a simplified approach based on event metadata
-    // In a real system, this would come from specific product purchase data
-    const topCertifications = [
-      { name: 'AWS Solutions Architect', sales: 45 },
-      { name: 'Google Cloud Professional', sales: 38 },
-      { name: 'Azure Developer', sales: 32 },
-      { name: 'CompTIA Security+', sales: 28 },
-      { name: 'CISSP', sales: 24 },
-    ];
+    // Issue #12 - top certifications data should come from product/order tables.
+    // Returning empty array until product catalog integration is available.
+    const topCertifications = [];
 
     return {
       signup_methods: signupMethods,

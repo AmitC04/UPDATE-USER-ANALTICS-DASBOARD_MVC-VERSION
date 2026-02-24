@@ -2,62 +2,88 @@ require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
 const prisma = require('./src/prisma');
+const logger = require('./src/utils/logger');
+const AppError = require('./src/utils/AppError');
+
 const app = express();
 const port = process.env.PORT || 4001;
 
-// Middleware
+// ──────────────────────────────────────────
+// Core Middleware
+// ──────────────────────────────────────────
 app.use(cors({ origin: true, credentials: true }));
 app.use(express.json());
 
-// Test database connection
+// ──────────────────────────────────────────
+// Database connection check
+// ──────────────────────────────────────────
 (async () => {
   try {
     await prisma.$connect();
-    console.log('✓ Connected to database via Prisma');
+    logger.info('Connected to database via Prisma');
   } catch (err) {
-    console.error('✗ Prisma connection error:', err.message || err);
+    logger.error('Prisma connection error:', { error: err.message });
   }
 })();
 
+// ──────────────────────────────────────────
 // Health check
+// ──────────────────────────────────────────
 app.get('/', (req, res) => {
   res.json({
     message: 'Analytics API Server',
     status: 'running',
     environment: process.env.NODE_ENV || 'development',
+    version: 'v1',
   });
 });
 
-// Analytics routes
-app.use('/api/analytics', require('./src/routes/analyticsRoutes'));
+// ──────────────────────────────────────────
+// Issue #10 - API v1 routes
+// ──────────────────────────────────────────
+app.use('/api/v1/analytics', require('./src/routes/analyticsRoutes'));
+app.use('/api/v1/user', require('./src/routes/userRoutes'));
 
-// User routes
-app.use('/api/user', require('./src/routes/userRoutes'));
-
-// Error handling middleware
+// ──────────────────────────────────────────
+// Issue #9 - Centralized error handling middleware
+// ──────────────────────────────────────────
 app.use((err, req, res, next) => {
-  console.error('Error:', err);
-  res.status(500).json({
-    success: false,
-    error: 'Internal server error',
+  // Operational errors (AppError) expose their message; others are generic
+  const statusCode = err.statusCode || 500;
+  const isOperational = err.isOperational === true;
+
+  logger.error('Unhandled error:', {
     message: err.message,
+    stack: err.stack,
+    path: req.path,
+    method: req.method,
+  });
+
+  res.status(statusCode).json({
+    success: false,
+    error: isOperational ? err.message : 'Internal server error',
+    // Issue #3 - only expose debug info in development
+    ...(process.env.NODE_ENV === 'development' && { debug: err.message, stack: err.stack }),
   });
 });
 
+// ──────────────────────────────────────────
 // Graceful shutdown
+// ──────────────────────────────────────────
 process.on('SIGINT', async () => {
-  console.log('\nShutting down Analytics server...');
+  logger.info('Shutting down Analytics server...');
   await prisma.$disconnect();
   process.exit(0);
 });
 
 app.listen(port, () => {
-  console.log(`✓ Analytics server running on http://localhost:${port}`);
-  console.log(`✓ Environment: ${process.env.NODE_ENV || 'development'}`);
+  logger.info(`Analytics server running on http://localhost:${port}`);
+  logger.info(`Environment: ${process.env.NODE_ENV || 'development'}`);
   if (!process.env.DATABASE_URL) {
-    console.log('⚠ Warning: DATABASE_URL not set.');
+    logger.warn('DATABASE_URL not set.');
   } else {
-    console.log('✓ Using DATABASE_URL from environment');
+    logger.info('Using DATABASE_URL from environment');
   }
 });
+
 

@@ -5,6 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, BarChart, Bar, PieChart, Pie, Cell } from 'recharts';
 import { Users, UserCheck, Activity, DollarSign, ShoppingCart, UserPlus, Key, RefreshCw, FileCheck, Award } from 'lucide-react';
 import { fetchOverview, fetchRevenueTrend, fetchUserAnalytics, fetchDetailedAnalytics } from '@/lib/api';
+import { LoadingSpinner } from './ui/loading-spinner'; // Issue #16 - shared loading component
 
 interface RevenueTrendData {
   month: string;
@@ -165,25 +166,16 @@ export function AdminAnalytics() {
           if (detailedAnalyticsResponse.success && detailedAnalyticsResponse.data?.signup_methods) {
             setSignupMethodData(detailedAnalyticsResponse.data.signup_methods);
           } else {
-            // Fallback to static data if detailed analytics fails
-            setSignupMethodData([
-              { name: 'Email', value: 156, color: '#3b82f6' },
-              { name: 'Google', value: 98, color: '#10b981' },
-            ]);
+            // Issue #12 - no hardcoded mock data; show empty state in UI
+            setSignupMethodData([]);
           }
 
           // Set top certifications data based on detailed analytics response
           if (detailedAnalyticsResponse.success && detailedAnalyticsResponse.data?.top_certifications) {
             setTopCertificationsData(detailedAnalyticsResponse.data.top_certifications);
           } else {
-            // Fallback to static data if detailed analytics fails
-            setTopCertificationsData([
-              { name: 'AWS Solutions Architect', sales: 45 },
-              { name: 'Google Cloud Professional', sales: 38 },
-              { name: 'Azure Developer', sales: 32 },
-              { name: 'CompTIA Security+', sales: 28 },
-              { name: 'CISSP', sales: 24 },
-            ]);
+            // Issue #12 - no hardcoded mock data; show empty state in UI
+            setTopCertificationsData([]);
           }
           // Check if user analytics was successful as well
           if (!userAnalyticsResponse.success) {
@@ -223,11 +215,7 @@ export function AdminAnalytics() {
   }
 
   if (loading) {
-    return (
-      <div className="p-6 text-center">
-        <h2 className="text-xl font-semibold">Loading analytics data...</h2>
-      </div>
-    );
+    return <LoadingSpinner message="Loading analytics data..." />;
   }
 
   return (
@@ -307,14 +295,20 @@ export function AdminAnalytics() {
               </ResponsiveContainer>
             </div>
             <div className="flex justify-center gap-6 mt-4">
-              <div className="flex items-center gap-2">
-                <div className="w-3 h-3 rounded-full bg-blue-500" />
-                <span className="text-sm text-gray-600">Email: 156 (61%)</span>
-              </div>
-              <div className="flex items-center gap-2">
-                <div className="w-3 h-3 rounded-full bg-green-500" />
-                <span className="text-sm text-gray-600">Google: 98 (39%)</span>
-              </div>
+              {signupMethodData.length > 0 ? (
+                signupMethodData.map((entry, index) => {
+                  const total = signupMethodData.reduce((sum, e) => sum + e.value, 0);
+                  const pct = total > 0 ? Math.round((entry.value / total) * 100) : 0;
+                  return (
+                    <div key={index} className="flex items-center gap-2">
+                      <div className="w-3 h-3 rounded-full" style={{ backgroundColor: entry.color }} />
+                      <span className="text-sm text-gray-600">{entry.name}: {entry.value} ({pct}%)</span>
+                    </div>
+                  );
+                })
+              ) : (
+                <span className="text-sm text-gray-400">No signup data for today</span>
+              )}
             </div>
           </CardContent>
         </Card>

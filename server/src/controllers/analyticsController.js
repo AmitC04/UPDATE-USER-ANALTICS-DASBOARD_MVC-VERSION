@@ -1,121 +1,93 @@
-const {
-  getOverviewData,
-  getFunnelData,
-  getUserAnalyticsData,
-  getRevenueTrendData,
-  getDetailedAnalyticsData,
-} = require('../models/analyticsModel');
+const { validationResult } = require('express-validator');
+const analyticsService = require('../services/analyticsService');
+const logger = require('../utils/logger');
 
 /**
  * Analytics Controller
- * Handles HTTP requests and responses for analytics endpoints
+ * Issue #8 - HTTP handling ONLY. Business logic lives in analyticsService.js.
+ * Issue #3 - Error messages never expose internal details.
+ * Issue #4 - All inputs validated via express-validator (see analyticsRoutes.js).
  */
 
+/** Helper: extract validated params or reject early */
+function checkValidation(req, res) {
+  const errors = validationResult(req);
+  if (!errors.isEmpty()) {
+    res.status(400).json({ success: false, errors: errors.array() });
+    return false;
+  }
+  return true;
+}
+
 /**
- * Get overview analytics (today's metrics)
+ * GET /api/v1/analytics/overview
  */
-async function getOverview(req, res) {
+async function getOverview(req, res, next) {
   try {
-    const data = await getOverviewData();
-    
-    res.json({
-      success: true,
-      data,
-    });
+    const data = await analyticsService.getOverview();
+    res.json({ success: true, data });
   } catch (error) {
-    console.error('Error fetching overview analytics:', error);
-    res.status(500).json({
-      success: false,
-      error: 'Failed to fetch overview analytics',
-      message: error.message,
-    });
+    logger.error('Overview analytics error:', { error: error.message, stack: error.stack, userId: req.user?.id });
+    next(error); // Issue #9 - centralized handler
   }
 }
 
 /**
- * Get conversion funnel data
+ * GET /api/v1/analytics/funnel?startDate=&endDate=
+ * Issue #4 - dates validated as ISO-8601 in routes
  */
-async function getFunnel(req, res) {
+async function getFunnel(req, res, next) {
+  if (!checkValidation(req, res)) return;
   try {
     const { startDate, endDate } = req.query;
-    const data = await getFunnelData(startDate, endDate);
-    
-    res.json({
-      success: true,
-      data,
-    });
+    const data = await analyticsService.getFunnel(startDate, endDate);
+    res.json({ success: true, data });
   } catch (error) {
-    console.error('Error fetching funnel data:', error);
-    res.status(500).json({
-      success: false,
-      error: 'Failed to fetch funnel data',
-      message: error.message,
-    });
+    logger.error('Funnel analytics error:', { error: error.message, stack: error.stack });
+    next(error);
   }
 }
 
 /**
- * Get user analytics
+ * GET /api/v1/analytics/users?startDate=&endDate=
  */
-async function getUserAnalytics(req, res) {
+async function getUserAnalytics(req, res, next) {
+  if (!checkValidation(req, res)) return;
   try {
     const { startDate, endDate } = req.query;
-    const data = await getUserAnalyticsData(startDate, endDate);
-    
-    res.json({
-      success: true,
-      data,
-    });
+    const data = await analyticsService.getUserAnalytics(startDate, endDate);
+    res.json({ success: true, data });
   } catch (error) {
-    console.error('Error fetching user analytics:', error);
-    res.status(500).json({
-      success: false,
-      error: 'Failed to fetch user analytics',
-      message: error.message,
-    });
+    logger.error('User analytics error:', { error: error.message, stack: error.stack });
+    next(error);
   }
 }
 
 /**
- * Get revenue trend (last N months)
+ * GET /api/v1/analytics/revenue-trend?months=5
  */
-async function getRevenueTrend(req, res) {
+async function getRevenueTrend(req, res, next) {
+  if (!checkValidation(req, res)) return;
   try {
-    const { months = 5 } = req.query;
-    const data = await getRevenueTrendData(parseInt(months));
-    
-    res.json({
-      success: true,
-      data,
-    });
+    const months = req.query.months || 5;
+    const data = await analyticsService.getRevenueTrend(months);
+    res.json({ success: true, data });
   } catch (error) {
-    console.error('Error fetching revenue trend:', error);
-    res.status(500).json({
-      success: false,
-      error: 'Failed to fetch revenue trend',
-      message: error.message,
-    });
+    logger.error('Revenue trend error:', { error: error.message, stack: error.stack });
+    next(error);
   }
 }
 
 /**
- * Get detailed analytics for charts and advanced metrics
+ * GET /api/v1/analytics/detailed
  */
-async function getDetailedAnalytics(req, res) {
+async function getDetailedAnalytics(req, res, next) {
   try {
-    const data = await getDetailedAnalyticsData();
-    
-    res.json({
-      success: true,
-      data,
-    });
+    const data = await analyticsService.getDetailedAnalytics();
+    res.json({ success: true, data });
   } catch (error) {
-    console.error('Error fetching detailed analytics:', error);
-    res.status(500).json({
-      success: false,
-      error: 'Failed to fetch detailed analytics',
-      message: error.message,
-    });
+    logger.error('Detailed analytics error:', { error: error.message, stack: error.stack });
+    next(error);
   }
 }
 

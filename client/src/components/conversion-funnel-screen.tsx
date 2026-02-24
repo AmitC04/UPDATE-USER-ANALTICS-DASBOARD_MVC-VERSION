@@ -4,6 +4,7 @@ import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
 import { ChevronDown } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { fetchFunnel } from '@/lib/api';
+import { LoadingSpinner } from './ui/loading-spinner'; // Issue #16
 
 interface FunnelStep {
   step: string;
@@ -63,11 +64,7 @@ export function ConversionFunnelScreen() {
   };
 
   if (loading) {
-    return (
-      <div className="flex justify-center items-center h-64">
-        <div className="text-lg text-gray-500">Loading conversion funnel data...</div>
-      </div>
-    );
+    return <LoadingSpinner message="Loading conversion funnel data..." />;
   }
 
   if (error) {

@@ -14,6 +14,7 @@ import {
 } from './ui/table';
 import { Badge } from './ui/badge';
 import { fetchUserAnalytics } from '@/lib/api';
+import { LoadingSpinner } from './ui/loading-spinner'; // Issue #16
 
 interface ChartDataInput {
   [key: string]: any;
@@ -147,11 +148,7 @@ export function UserAnalyticsScreen() {
   }
 
   if (loading) {
-    return (
-      <div className="p-6 text-center">
-        <h2 className="text-xl font-semibold">Loading user analytics...</h2>
-      </div>
-    );
+    return <LoadingSpinner message="Loading user analytics..." />;
   }
 
   return (

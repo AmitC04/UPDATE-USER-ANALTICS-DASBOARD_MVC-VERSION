@@ -1,7 +1,6 @@
 const jwt = require('jsonwebtoken');
-const { PrismaClient } = require('@prisma/client');
-
-const prisma = new PrismaClient();
+const prisma = require('../prisma'); // Issue #6 - use singleton Prisma client
+const logger = require('../utils/logger');
 
 const requireAuth = async (req, res, next) => {
   try {
@@ -51,11 +50,12 @@ const requireAuth = async (req, res, next) => {
       });
     }
 
-    console.error('Authentication error:', error);
+    // Issue #3 - log internally, never expose internals to client
+    logger.error('Authentication error:', { error: error.message, stack: error.stack });
     res.status(500).json({
       success: false,
       error: 'Authentication failed',
-      message: error.message,
+      ...(process.env.NODE_ENV === 'development' && { debug: error.message }),
     });
   }
 };
