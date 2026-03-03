@@ -4,9 +4,19 @@ const cors = require('cors');
 const prisma = require('./src/prisma');
 const logger = require('./src/utils/logger');
 const AppError = require('./src/utils/AppError');
+const cache = require('./src/utils/cache');
 
 const app = express();
 const port = process.env.PORT || 4001;
+
+// ──────────────────────────────────────────
+// BigInt JSON serialization fix (Backend Issue #2)
+// Express uses JSON.stringify internally; this replacer converts BigInt to
+// string so API responses never throw "TypeError: Do not know how to serialize a BigInt".
+// ──────────────────────────────────────────
+app.set('json replacer', (key, value) =>
+  typeof value === 'bigint' ? value.toString() : value
+);
 
 // ──────────────────────────────────────────
 // Core Middleware
@@ -36,6 +46,13 @@ app.get('/', (req, res) => {
     environment: process.env.NODE_ENV || 'development',
     version: 'v1',
   });
+});
+
+// ──────────────────────────────────────────
+// Cache stats (Backend Issue #23)
+// ──────────────────────────────────────────
+app.get('/api/v1/cache/stats', (req, res) => {
+  res.json({ success: true, data: cache.getCacheStats() });
 });
 
 // ──────────────────────────────────────────

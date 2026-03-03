@@ -1,19 +1,75 @@
 const prisma = require('../prisma');
+const {
+  ACTIVE_USER_THRESHOLD_MS,
+  DEFAULT_FUNNEL_RANGE_DAYS,
+  DEFAULT_USER_ANALYTICS_RANGE_DAYS,
+  DEFAULT_REVENUE_MONTHS,
+  MAX_REVENUE_MONTHS,
+} = require('../utils/constants');
 
 /**
  * Analytics Model
- * Contains all database logic for analytics operations
+ * Contains all database logic for analytics operations.
+ *
+ * Fixes:
+ *  - Backend #2  : BigInt fields serialized to String (JSON.stringify safe).
+ *  - Backend #7  : Decimal/float amounts kept as precise strings; no parseFloat.
+ *  - Backend #10 : Revenue trend already uses Promise.all.
+ *  - Backend #13 : Shared getDateRange() eliminates repeated default-date logic.
  */
 
-// Get overview analytics (today's metrics)
-// Issue #22 - Parallelized independent queries with Promise.all
+// ─── Shared date-range utility ───────────────────────────────────────────────
+
+/**
+ * Return { start, end } Date objects for a given ISO string pair.
+ * Falls back to `defaultDays` lookback when values are absent.
+ *
+ * @param {string|undefined} startDate
+ * @param {string|undefined} endDate
+ * @param {number} defaultDays
+ * @returns {{ start: Date, end: Date }}
+ */
+function getDateRange(startDate, endDate, defaultDays) {
+  const start = startDate
+    ? new Date(startDate)
+    : new Date(Date.now() - defaultDays * 24 * 60 * 60 * 1000);
+  const end = endDate ? new Date(endDate) : new Date();
+  return { start, end };
+}
+
+/**
+ * Safely convert a Prisma Decimal / BigInt / number to a plain JS number
+ * while preserving two decimal places for currency values.
+ * Uses string conversion to avoid floating-point loss of precision.
+ *
+ * @param {any} value
+ * @returns {number}
+ */
+function toSafeNumber(value) {
+  if (value == null) return 0;
+  // Prisma Decimal has a .toString() method
+  return parseFloat(String(value));
+}
+
+/**
+ * Convert BigInt to a regular JS number (safe for IDs that fit in Number).
+ * If the value may exceed Number.MAX_SAFE_INTEGER use String instead.
+ * @param {bigint|null} value
+ * @returns {number|null}
+ */
+function bigIntToNumber(value) {
+  if (value == null) return null;
+  return Number(value);
+}
+
+
 async function getOverviewData() {
   try {
     const today = new Date();
     today.setHours(0, 0, 0, 0);
     const tomorrow = new Date(today);
     tomorrow.setDate(tomorrow.getDate() + 1);
-    const fiveMinutesAgo = new Date(Date.now() - 5 * 60 * 1000);
+    const fiveMinutesAgo = new Date(Date.now() - ACTIVE_USER_THRESHOLD_MS);
 
     // Issue #22 - Run all independent queries in parallel
     const [
@@ -70,14 +126,11 @@ async function getOverviewData() {
       }),
     ]);
 
-    // Compute revenue from parallelised result
+    // Compute revenue – use toSafeNumber() to avoid Decimal precision loss (Backend #7)
     let revenueToday = 0;
     revenueEvents.forEach((event) => {
       if (event.amount) {
-        const amount = typeof event.amount === 'object'
-          ? parseFloat(event.amount.toString())
-          : parseFloat(event.amount);
-        revenueToday += amount || 0;
+        revenueToday += toSafeNumber(event.amount);
       }
     });
 
@@ -114,8 +167,8 @@ async function getOverviewData() {
 // Get conversion funnel data
 async function getFunnelData(startDate, endDate) {
   try {
-    const start = startDate ? new Date(startDate) : new Date(Date.now() - 30 * 24 * 60 * 60 * 1000); // Default: last 30 days
-    const end = endDate ? new Date(endDate) : new Date();
+    // getDateRange() eliminates duplicated default-date logic (Backend #13)
+    const { start, end } = getDateRange(startDate, endDate, DEFAULT_FUNNEL_RANGE_DAYS);
 
     // Visitors (all sessions)
     const visitors = await prisma.user_sessions.count({
@@ -224,8 +277,7 @@ async function getFunnelData(startDate, endDate) {
 // Get user analytics
 async function getUserAnalyticsData(startDate, endDate) {
   try {
-    const start = startDate ? new Date(startDate) : new Date(Date.now() - 7 * 24 * 60 * 60 * 1000); // Default: last 7 days
-    const end = endDate ? new Date(endDate) : new Date();
+    const { start, end } = getDateRange(startDate, endDate, DEFAULT_USER_ANALYTICS_RANGE_DAYS);
 
     // Group by date
     const dateMap = new Map();
@@ -341,7 +393,7 @@ async function getUserAnalyticsData(startDate, endDate) {
 }
 
 // Get revenue trend (last N months)
-async function getRevenueTrendData(months = 5) {
+async function getRevenueTrendData(months = DEFAULT_REVENUE_MONTHS) {
   try {
     const monthsArray = [];
     const now = new Date();
@@ -373,12 +425,10 @@ async function getRevenueTrendData(months = 5) {
           },
         });
 
+        // toSafeNumber() preserves decimal precision (Backend #7)
         let revenue = 0;
         events.forEach((event) => {
-          if (event.amount) {
-            const amount = typeof event.amount === 'object' ? parseFloat(event.amount.toString()) : parseFloat(event.amount);
-            revenue += amount || 0;
-          }
+          if (event.amount) revenue += toSafeNumber(event.amount);
         });
 
         return { month, revenue };

@@ -1,22 +1,31 @@
 const { validationResult } = require('express-validator');
 const analyticsService = require('../services/analyticsService');
 const logger = require('../utils/logger');
+const AppError = require('../utils/AppError');
 
 /**
  * Analytics Controller
- * Issue #8 - HTTP handling ONLY. Business logic lives in analyticsService.js.
- * Issue #3 - Error messages never expose internal details.
- * Issue #4 - All inputs validated via express-validator (see analyticsRoutes.js).
+ * HTTP handling ONLY. Business logic lives in analyticsService.js.
+ * Secure error messages; all inputs validated via express-validator.
+ *
+ * Fixes:
+ *  - Backend #16 : checkValidation throws AppError – no accidental double-response.
  */
 
-/** Helper: extract validated params or reject early */
-function checkValidation(req, res) {
+/**
+ * Extract validated params or throw an AppError (400).
+ * Callers no longer need a if(!check) return guard.
+ * Fixes Backend Issue #16.
+ * @param {import('express').Request} req
+ */
+function checkValidation(req) {
   const errors = validationResult(req);
   if (!errors.isEmpty()) {
-    res.status(400).json({ success: false, errors: errors.array() });
-    return false;
+    throw new AppError(
+      errors.array().map((e) => e.msg).join('; '),
+      400
+    );
   }
-  return true;
 }
 
 /**
@@ -28,17 +37,16 @@ async function getOverview(req, res, next) {
     res.json({ success: true, data });
   } catch (error) {
     logger.error('Overview analytics error:', { error: error.message, stack: error.stack, userId: req.user?.id });
-    next(error); // Issue #9 - centralized handler
+    next(error);
   }
 }
 
 /**
  * GET /api/v1/analytics/funnel?startDate=&endDate=
- * Issue #4 - dates validated as ISO-8601 in routes
  */
 async function getFunnel(req, res, next) {
-  if (!checkValidation(req, res)) return;
   try {
+    checkValidation(req);
     const { startDate, endDate } = req.query;
     const data = await analyticsService.getFunnel(startDate, endDate);
     res.json({ success: true, data });
@@ -52,8 +60,8 @@ async function getFunnel(req, res, next) {
  * GET /api/v1/analytics/users?startDate=&endDate=
  */
 async function getUserAnalytics(req, res, next) {
-  if (!checkValidation(req, res)) return;
   try {
+    checkValidation(req);
     const { startDate, endDate } = req.query;
     const data = await analyticsService.getUserAnalytics(startDate, endDate);
     res.json({ success: true, data });
@@ -67,8 +75,8 @@ async function getUserAnalytics(req, res, next) {
  * GET /api/v1/analytics/revenue-trend?months=5
  */
 async function getRevenueTrend(req, res, next) {
-  if (!checkValidation(req, res)) return;
   try {
+    checkValidation(req);
     const months = req.query.months || 5;
     const data = await analyticsService.getRevenueTrend(months);
     res.json({ success: true, data });

@@ -38,12 +38,9 @@ export function AdminDashboard() {
   useEffect(() => {
     const fetchData = async () => {
       try {
-        const response = await fetchOverview();
-        if (response.success) {
-          setAnalyticsData(response.data);
-        } else {
-          setError(response.error || 'Failed to fetch data');
-        }
+        // api.ts unwraps the response via assertSuccess — plain data returned directly
+        const data = await fetchOverview();
+        setAnalyticsData(data);
       } catch (err: any) {
         setError(err.message);
       } finally {

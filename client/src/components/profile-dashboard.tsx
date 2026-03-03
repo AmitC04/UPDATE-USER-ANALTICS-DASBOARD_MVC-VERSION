@@ -19,27 +19,26 @@ export function ProfileDashboard() {
   const [userData, setUserData] = useState<UserData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [retryCount, setRetryCount] = useState(0);
 
   useEffect(() => {
+    let cancelled = false;
     const fetchProfile = async () => {
+      setLoading(true);
+      setError(null);
       try {
-        const res = await fetchUser();
-        // fetchUser may return { success, data, isDemo } or { success, data }
-        const payload = res.data ?? res;
-        if (res.success !== false) {
-          setUserData({ ...payload, isDemo: res.isDemo ?? false });
-        } else {
-          setError(res.error || 'Failed to fetch user data');
-        }
+        // fetchUser now returns UserProfile directly (assertSuccess unwraps it)
+        const profile = await fetchUser();
+        if (!cancelled) setUserData({ ...profile, isDemo: profile.isDemo ?? false });
       } catch (err: any) {
-        setError(err.message);
+        if (!cancelled) setError(err.message);
       } finally {
-        setLoading(false);
+        if (!cancelled) setLoading(false);
       }
     };
-
     fetchProfile();
-  }, []);
+    return () => { cancelled = true; };
+  }, [retryCount]);
 
   if (error) {
     return (
@@ -47,7 +46,7 @@ export function ProfileDashboard() {
         <h2 className="text-xl font-semibold text-red-600">Error loading profile</h2>
         <p className="text-gray-600">{error}</p>
         <button 
-          onClick={() => window.location.reload()} 
+          onClick={() => setRetryCount(c => c + 1)} 
           className="mt-4 px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600"
         >
           Retry

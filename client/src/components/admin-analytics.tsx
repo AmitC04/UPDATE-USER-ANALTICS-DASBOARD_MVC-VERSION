@@ -24,7 +24,7 @@ interface SignupMethodData extends ChartDataInput {
 
 interface TopCertificationsData extends ChartDataInput {
   name: string;
-  sales: number;
+  count: number;
 }
 
 interface KpiData {
@@ -50,23 +50,19 @@ export function AdminAnalytics() {
   useEffect(() => {
     const fetchData = async () => {
       try {
-        // Fetch revenue trend data
-        const revenueResponse = await fetchRevenueTrend(5);
-        if (revenueResponse.success) {
-          setRevenueTrendData(revenueResponse.data);
-        } else {
-          throw new Error(revenueResponse.error || 'Failed to fetch revenue trend');
-        }
+        // Fetch revenue trend data — api.ts unwraps the response directly
+        const revenueData = await fetchRevenueTrend(5);
+        setRevenueTrendData(revenueData);
 
         // Fetch overview data
-        const overviewResponse = await fetchOverview();
+        const data = await fetchOverview();
         // Also fetch user analytics to get registration data
         const userAnalyticsResponse = await fetchUserAnalytics('', '');
-        // Fetch detailed analytics for charts
-        const detailedAnalyticsResponse = await fetchDetailedAnalytics();
+        // Fetch detailed analytics for charts — api.ts unwraps the response directly
+        const detailedData = await fetchDetailedAnalytics();
         
-        if (overviewResponse.success) {
-          const data = overviewResponse.data;
+        {
+          // data and detailedData are already unwrapped plain objects
           
           // Get registration data from user analytics if available
           let registrationCount = '0';
@@ -146,7 +142,7 @@ export function AdminAnalytics() {
             },
             {
               title: 'Reviews Submitted',
-              value: detailedAnalyticsResponse.success ? detailedAnalyticsResponse.data.reviews_submitted?.toString() || '0' : '0', // Backend provides this metric
+              value: detailedData.reviews_submitted?.toString() || '0', // Backend provides this metric
               subtext: 'For certification',
               icon: FileCheck,
               color: 'text-cyan-600',
@@ -163,31 +159,15 @@ export function AdminAnalytics() {
           ]);
 
           // Set signup methods data based on detailed analytics response
-          if (detailedAnalyticsResponse.success && detailedAnalyticsResponse.data?.signup_methods) {
-            setSignupMethodData(detailedAnalyticsResponse.data.signup_methods);
-          } else {
-            // Issue #12 - no hardcoded mock data; show empty state in UI
-            setSignupMethodData([]);
-          }
+          setSignupMethodData(detailedData.signup_methods ?? []);
 
           // Set top certifications data based on detailed analytics response
-          if (detailedAnalyticsResponse.success && detailedAnalyticsResponse.data?.top_certifications) {
-            setTopCertificationsData(detailedAnalyticsResponse.data.top_certifications);
-          } else {
-            // Issue #12 - no hardcoded mock data; show empty state in UI
-            setTopCertificationsData([]);
-          }
+          setTopCertificationsData(detailedData.top_certifications ?? []);
+
           // Check if user analytics was successful as well
           if (!userAnalyticsResponse.success) {
             console.warn('Failed to fetch user analytics:', userAnalyticsResponse.error);
           }
-          
-          // Check if detailed analytics was successful as well
-          if (!detailedAnalyticsResponse.success) {
-            console.warn('Failed to fetch detailed analytics:', detailedAnalyticsResponse.error);
-          }
-        } else {
-          throw new Error(overviewResponse.error || 'Failed to fetch overview data');
         }
       } catch (err: any) {
         setError(err.message);
@@ -330,7 +310,7 @@ export function AdminAnalytics() {
                     borderRadius: '8px',
                   }}
                 />
-                <Bar dataKey="sales" fill="#f59e0b" radius={[0, 4, 4, 0]} />
+                <Bar dataKey="count" fill="#f59e0b" radius={[0, 4, 4, 0]} />
               </BarChart>
             </ResponsiveContainer>
           </CardContent>

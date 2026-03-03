@@ -26,19 +26,17 @@ export function ConversionFunnelScreen() {
   useEffect(() => {
     const loadFunnelData = async () => {
       try {
-        const response = await fetchFunnel('', '');
-        if (response.success && response.data) {
-          // Add colors to the funnel steps
-          const funnelWithColors = response.data.funnel.map((step: FunnelStep, index: number) => ({
+        // api.ts unwraps the response via assertSuccess — plain FunnelData returned
+        const data = await fetchFunnel('', '');
+        const funnelWithColors = data.funnel.map((step: FunnelStep, index: number) => ({
             ...step,
-            color: getColorForIndex(index, response.data.funnel.length)
+            color: getColorForIndex(index, data.funnel.length)
           }));
           
           setFunnelData({
             funnel: funnelWithColors,
-            overall_conversion: response.data.overall_conversion
+            overall_conversion: data.overall_conversion
           });
-        }
       } catch (err) {
         setError(err instanceof Error ? err.message : 'Failed to fetch funnel data');
       } finally {
